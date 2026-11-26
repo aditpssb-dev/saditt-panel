@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SADITT Panel — Manage Key</title>
+<style>
+  :root { --bg:#0f1115; --card:#171a21; --line:#262b36; --text:#e8eaf0; --muted:#9aa3b2; --gold:#d4a017; --green:#22c55e; --red:#ef4444; --amber:#f59e0b; --blue:#3b82f6; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  header { padding:18px 20px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0; }
+  header h1 span { color:var(--gold); }
+  header .sub { color:var(--muted); font-size:12px; }
+  header .spacer { flex:1; }
+  .pill { font-size:12px; padding:3px 10px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
+  .pill.ok { color:#4ade80; border-color:#14532d; }
+  .pill.bad { color:#f87171; border-color:#7f1d1d; }
+  main { max-width:1100px; margin:0 auto; padding:20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
+  .card h2 { margin:0 0 12px; font-size:15px; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  input, select, button { font:inherit; color:var(--text); background:#0f1218; border:1px solid var(--line); border-radius:8px; padding:9px 12px; }
+  input:focus, select:focus { outline:2px solid var(--gold); outline-offset:0; border-color:var(--gold); }
+  button { cursor:pointer; background:#1e2430; }
+  button:hover { border-color:var(--gold); }
+  button.primary { background:var(--gold); color:#111; border-color:var(--gold); font-weight:700; }
+  button.danger { color:#f87171; border-color:#7f1d1d; }
+  button:disabled { opacity:.5; cursor:wait; }
+  .grow { flex:1; min-width:180px; }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  td.key { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; word-break:break-all; }
+  .badge { display:inline-block; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px; }
+  .badge.active { background:#052e16; color:#4ade80; }
+  .badge.expired { background:#450a0a; color:#f87171; }
+  .badge.disabled { background:#1f2937; color:#9ca3af; }
+  .actions { display:flex; gap:6px; flex-wrap:wrap; }
+  .actions button { padding:5px 9px; font-size:12px; }
+  .muted { color:var(--muted); font-size:12px; }
+  #msg { min-height:20px; font-size:13px; margin-top:8px; }
+  #msg.err { color:#f87171; }
+  #msg.ok { color:#4ade80; }
+  .hidden { display:none !important; }
+  @media (max-width:700px){ th:nth-child(4), td:nth-child(4), th:nth-child(6), td:nth-child(6){ display:none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>SADITT</span> Panel — Manage Key</h1>
+  <span class="sub">Worker: saditt-admin &middot; DB: sadittmod (D1)</span>
+  <span class="spacer"></span>
+  <span id="apiPill" class="pill">API: belum dicek</span>
+  <button id="logoutBtn" class="hidden">Logout</button>
+</header>
+<main>
+  <div id="loginCard" class="card">
+    <h2>Login Admin</h2>
+    <div class="row">
+      <input id="tokenInput" class="grow" type="password" placeholder="ADMIN_TOKEN" autocomplete="off">
+      <button id="loginBtn" class="primary">Masuk</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <input id="apiInput" class="grow" type="text" value="https://saditt-admin.aditpssb.workers.dev">
+      <span class="muted">URL Worker admin (jangan diubah kecuali Worker pindah)</span>
+    </div>
+    <div id="loginMsg" class="muted"></div>
+  </div>
+
+  <div id="appCard" class="card hidden">
+    <h2>Key</h2>
+    <div class="row" style="margin-bottom:12px">
+      <input id="q" class="grow" type="search" placeholder="Cari key...">
+      <select id="filter">
+        <option value="all">Semua</option>
+        <option value="active">Aktif</option>
+        <option value="expired">Expired</option>
+        <option value="disabled">Disabled</option>
+      </select>
+      <button id="refreshBtn">Refresh</button>
+    </div>
+    <div class="row" style="margin-bottom:12px">
+      <input id="newDays" type="number" min="1" max="3650" value="1" style="width:90px" title="Durasi (hari)">
+      <input id="newMax" type="number" min="1" max="10" value="1" style="width:90px" title="Max device">
+      <input id="newKey" class="grow" type="text" placeholder="Key custom (opsional, kosong = auto-generate)">
+      <button id="createBtn" class="primary">+ Buat Key</button>
+    </div>
+    <div id="msg"></div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Key</th><th>Status</th><th>Sisa</th><th>Device</th><th>Max</th><th>Last Used</th><th>Aksi</th></tr></thead>
+        <tbody id="tbody"><tr><td colspan="7" class="muted">Memuat...</td></tr></tbody>
+      </table>
+    </div>
+    <div id="count" class="muted" style="margin-top:10px"></div>
+  </div>
+</main>
+<script>
+(function(){
+  var LS_TOKEN = "saditt_admin_token";
+  var LS_API = "saditt_admin_api";
+  var DEFAULT_API = "https://saditt-admin.aditpssb.workers.dev";
+  var $ = function(id){ return document.getElementById(id); };
+  var token = localStorage.getItem(LS_TOKEN) || "";
+  var api = (localStorage.getItem(LS_API) || DEFAULT_API).replace(/\/+$/,"");
+
+  function setMsg(text, kind){
+    var m = $("msg"); if(!m) return;
+    m.textContent = text || "";
+    m.className = kind || "";
+  }
+  function fmtDate(ts){
+    if(!ts) return "-";
+    var d = new Date(ts*1000);
+    return d.toLocaleDateString("id-ID") + " " + d.toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"});
+  }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+
+  async function apiCall(method, path, body){
+    var res = await fetch(api + path, {
+      method: method,
+      headers: { "Content-Type":"application/json", "Authorization":"Bearer "+token },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    var data = await res.json().catch(function(){ return { ok:false, error:"BAD_JSON" }; });
+    if(!res.ok || data.ok === false) throw new Error(data.error || ("HTTP "+res.status));
+    return data;
+  }
+
+  async function checkHealth(){
+    var pill = $("apiPill");
+    try {
+      var res = await fetch(api + "/admin/health");
+      var data = await res.json();
+      if(data.ok){ pill.textContent = "API: online"; pill.className = "pill ok"; }
+      else { pill.textContent = "API: error"; pill.className = "pill bad"; }
+    } catch(e){ pill.textContent = "API: tidak terjangkau"; pill.className = "pill bad"; }
+  }
+
+  async function loadKeys(){
+    var q = $("q").value.trim();
+    var f = $("filter").value;
+    var url = "/admin/keys?filter=" + encodeURIComponent(f);
+    if(q) url += "&q=" + encodeURIComponent(q);
+    setMsg("");
+    var tb = $("tbody");
+    tb.innerHTML = '<tr><td colspan="7" class="muted">Memuat...</td></tr>';
+    try {
+      var data = await apiCall("GET", url);
+      var keys = data.keys || [];
+      $("count").textContent = keys.length + " key";
+      if(!keys.length){ tb.innerHTML = '<tr><td colspan="7" class="muted">Tidak ada key.</td></tr>'; return; }
+      tb.innerHTML = keys.map(function(k){
+        var days = (k.days_remaining >= 999999) ? "tanpa batas" : (k.days_remaining + " hari");
+        var badge = k.status === "active" ? '<span class="badge active">AKTIF</span>'
+                  : k.status === "expired" ? '<span class="badge expired">EXPIRED</span>'
+                  : '<span class="badge disabled">DISABLED</span>';
+        var toggle = k.enabled
+          ? '<button data-act="disable" data-key="'+esc(k.key)+'">Disable</button>'
+          : '<button data-act="enable" data-key="'+esc(k.key)+'">Enable</button>';
+        return '<tr>'
+          + '<td class="key">'+esc(k.key)+'</td>'
+          + '<td>'+badge+'</td>'
+          + '<td>'+esc(days)+'</td>'
+          + '<td>'+k.devices_used+'</td>'
+          + '<td>'+k.max_devices+'</td>'
+          + '<td class="muted">'+fmtDate(k.last_used_at)+'</td>'
+          + '<td><div class="actions">'
+          + toggle
+          + '<button data-act="reset-hwid" data-key="'+esc(k.key)+'">Reset HWID</button>'
+          + '<button data-act="extend" data-key="'+esc(k.key)+'">+Hari</button>'
+          + '<button data-act="delete" data-key="'+esc(k.key)+'" class="danger">Hapus</button>'
+          + '</div></td></tr>';
+      }).join("");
+    } catch(e){
+      tb.innerHTML = '<tr><td colspan="7" class="muted">Gagal memuat: '+esc(e.message)+'</td></tr>';
+      if(String(e.message) === "UNAUTHORIZED") doLogout("Token salah / expired. Login lagi.");
+    }
+  }
+
+  async function doAction(act, key){
+    if(act === "delete" && !confirm("Hapus key ini? Key + semua device-nya ikut terhapus.\n" + key)) return;
+    var days = null;
+    if(act === "extend"){
+      var v = prompt("Tambah berapa hari?", "1");
+      if(v === null) return;
+      days = parseInt(v, 10);
+      if(!days || days < 1){ alert("Jumlah hari tidak valid."); return; }
+    }
+    setMsg("Memproses...", "");
+    try {
+      var data = await apiCall("POST", "/admin/keys/" + encodeURIComponent(key) + "/" + act, act === "extend" ? { days: days } : undefined);
+      var extra = "";
+      if(act === "reset-hwid") extra = " (" + (data.devices_cleared||0) + " device dilepas)";
+      if(act === "extend") extra = " (expired baru: " + fmtDate(data.expires_at) + ")";
+      setMsg("Berhasil: " + act + " " + key + extra, "ok");
+      loadKeys();
+    } catch(e){ setMsg("Gagal: " + e.message, "err"); }
+  }
+
+  function showApp(){
+    $("loginCard").classList.add("hidden");
+    $("appCard").classList.remove("hidden");
+    $("logoutBtn").classList.remove("hidden");
+    loadKeys();
+  }
+  function doLogout(msg){
+    token = "";
+    localStorage.removeItem(LS_TOKEN);
+    $("appCard").classList.add("hidden");
+    $("logoutBtn").classList.add("hidden");
+    $("loginCard").classList.remove("hidden");
+    if(msg) $("loginMsg").textContent = msg;
+  }
+
+  $("loginBtn").addEventListener("click", async function(){
+    var t = $("tokenInput").value.trim();
+    var a = $("apiInput").value.trim().replace(/\/+$/,"") || DEFAULT_API;
+    if(!t){ $("loginMsg").textContent = "Masukkan ADMIN_TOKEN."; return; }
+    token = t; api = a;
+    $("loginMsg").textContent = "Mengecek token...";
+    try {
+      await apiCall("GET", "/admin/keys?filter=all");
+      localStorage.setItem(LS_TOKEN, token);
+      localStorage.setItem(LS_API, api);
+      $("loginMsg").textContent = "";
+      checkHealth();
+      showApp();
+    } catch(e){
+      $("loginMsg").textContent = "Login gagal: " + e.message;
+    }
+  });
+  $("tokenInput").addEventListener("keydown", function(e){ if(e.key === "Enter") $("loginBtn").click(); });
+  $("logoutBtn").addEventListener("click", function(){ doLogout(); });
+  $("refreshBtn").addEventListener("click", loadKeys);
+  $("q").addEventListener("input", function(){ clearTimeout(window.__qt); window.__qt = setTimeout(loadKeys, 350); });
+  $("filter").addEventListener("change", loadKeys);
+  $("createBtn").addEventListener("click", async function(){
+    var days = parseInt($("newDays").value, 10) || 1;
+    var max = parseInt($("newMax").value, 10) || 1;
+    var custom = $("newKey").value.trim();
+    var btn = $("createBtn"); btn.disabled = true;
+    setMsg("Membuat key...", "");
+    try {
+      var body = { duration_days: days, max_devices: max };
+      if(custom) body.key = custom;
+      var data = await apiCall("POST", "/admin/keys", body);
+      setMsg("Key baru: " + data.key + " (valid " + data.days + " hari, expired " + fmtDate(data.expires_at) + ")", "ok");
+      $("newKey").value = "";
+      loadKeys();
+    } catch(e){ setMsg("Gagal buat key: " + e.message, "err"); }
+    btn.disabled = false;
+  });
+  $("tbody").addEventListener("click", function(e){
+    var b = e.target.closest("button[data-act]");
+    if(!b) return;
+    doAction(b.getAttribute("data-act"), b.getAttribute("data-key"));
+  });
+
+  // boot
+  $("apiInput").value = api;
+  checkHealth();
+  if(token){
+    // try silent login
+    apiCall("GET", "/admin/keys?filter=all").then(function(){ showApp(); }).catch(function(){ /* stay on login */ });
+  }
+})();
+</script>
+</body>
+</html>
